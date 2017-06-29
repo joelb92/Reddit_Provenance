@@ -430,7 +430,7 @@ while (not shouldReadThreads and postCount < maxPosts) or shouldReadThreads or n
                 node = {}
                 node['nodeConfidenceScore'] = 1.0
                 node['id'] = commentID
-                if commentID is in imageNamesList.keys():
+                if commentID in imageNamesList.keys():
                     imageNamesData = imageNamesList[commentID]
                     if imageNamesData is not None:
                         node['file']=imageNamesData[1]
