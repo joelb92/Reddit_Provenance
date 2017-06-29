@@ -232,16 +232,17 @@ def downloadImages(image_urls,out_dir,k):
             data = f.read()
             f.close()
             print "   Datasize:",len(data)
-            bn = urlparse.urlsplit(each0).path.split('/')[-1]
-            ftype = bn.split(".")
-            ftype = ftype[len(ftype) - 1]
-            imgName = "g"+"%03d_"%k + each[1] + "."+ftype
-            out_path = os.path.join(out_dir,imgName)
-            imageNameList[each[1]]=(imgName,out_path,each)
-            f = open(out_path,'wb')
-            f.write(data)
-            f.close()
-            i+=1
+            if len(data) > 600:
+                bn = urlparse.urlsplit(each0).path.split('/')[-1]
+                ftype = bn.split(".")
+                ftype = ftype[len(ftype) - 1]
+                imgName = "g"+"%03d_"%k + each[1] + "."+ftype
+                out_path = os.path.join(out_dir,imgName)
+                imageNameList[each[1]]=(imgName,out_path,each)
+                f = open(out_path,'wb')
+                f.write(data)
+                f.close()
+                i+=1
 
 
         except KeyboardInterrupt:
@@ -430,14 +431,15 @@ while (not shouldReadThreads and postCount < maxPosts) or shouldReadThreads or n
                 node['nodeConfidenceScore'] = 1.0
                 node['id'] = commentID
                 imageNamesData = imageNamesList[commentID]
-                node['file']=imageNamesData[1]
-                node['fileid']=imageNamesData[0]
-                node['URL'] = imageNamesData[1]
-                nodes.append(node)
+                if imageNamesData is not None:
+                    node['file']=imageNamesData[1]
+                    node['fileid']=imageNamesData[0]
+                    node['URL'] = imageNamesData[1]
+                    nodes.append(node)
             for commentID in commentImages.keys():
                 currentParent = commentIDtoParentMap[commentID]
                 # Hop up comment tree until we find a comment with an image
-                while currentParent not in commentImages.keys() and not currentParent == "root":
+                while (currentParent not in commentImages.keys() or imageNamesList[currentParent] is None) and not currentParent == "root":
                     currentParent = commentIDtoParentMap[currentParent]
                 link = {}
                 link['source'] = currentParent
