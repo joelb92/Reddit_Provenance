@@ -430,12 +430,13 @@ while (not shouldReadThreads and postCount < maxPosts) or shouldReadThreads or n
                 node = {}
                 node['nodeConfidenceScore'] = 1.0
                 node['id'] = commentID
-                imageNamesData = imageNamesList[commentID]
-                if imageNamesData is not None:
-                    node['file']=imageNamesData[1]
-                    node['fileid']=imageNamesData[0]
-                    node['URL'] = imageNamesData[1]
-                    nodes.append(node)
+                if commentID is in imageNamesList.keys():
+                    imageNamesData = imageNamesList[commentID]
+                    if imageNamesData is not None:
+                        node['file']=imageNamesData[1]
+                        node['fileid']=imageNamesData[0]
+                        node['URL'] = imageNamesData[1]
+                        nodes.append(node)
             for commentID in commentImages.keys():
                 currentParent = commentIDtoParentMap[commentID]
                 # Hop up comment tree until we find a comment with an image
