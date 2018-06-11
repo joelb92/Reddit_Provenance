@@ -14,7 +14,7 @@ import urlparse
 import csv
 import traceback
 import json
-
+from six import string_types
 
 # ----------------------
 # Functions 
@@ -43,12 +43,16 @@ def readThreads(subreddit, cur):
         # Get the thread info
         threadId = t['data']['id']
         title = t['data']['title']
+
         permalink = t['data']['permalink']
         link = t['data']['url']
         score = t['data']['score']
         created = t['data']['created_utc']
         print "Found thread: " + title
-
+        # if 'Poop' not in title:
+        #     continue
+        # else:
+        #     print 'we have liftoff'
         # Save it to the database. Duplicate threads will be ignored due to the UNIQUE KEY constraint
         try:
             cur.execute("""INSERT INTO threads (id_thread, id_sub, title, url, link, score, created) values (%s, 1, %s, %s, %s, %s, %s)""", (threadId, title, permalink,link, int(score), created))
@@ -88,7 +92,7 @@ def readComments(obj, threadId, threadUrl, cur,parentID):
         if 'body' in i['data']:
 
             url = threadUrl + commentId
-            commentID = commentId
+
             content = i['data']['body']
             links = re.findall('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+', content)
             imgLinks = []
@@ -101,17 +105,18 @@ def readComments(obj, threadId, threadUrl, cur,parentID):
                     imgLinks.append(newLink)
             if len(imgLinks) > 0:
                 print "found links: " + str(imgLinks)
-                commentImages[commentID] = imgLinks
+                commentImages[commentId] = imgLinks
             if parentID == "":
-                parentID = "root"
-            commentIDtoParentMap[commentID] = parentID
+                commentId = 'root'
+                commentIDtoParentMap['root'] = None
+            commentIDtoParentMap[commentId] = parentID
             childList = []
             if parentID in commentIDtoChildMap:
                 childList = commentIDtoChildMap[parentID]
-                childList.append(commentID)
+                childList.append(commentId)
             else:
                 childList = []
-                childList.append(commentID)
+                childList.append(commentId)
             commentIDtoChildMap[parentID] = childList
             ups = int(i['data']['ups'])
             downs = int(i['data']['downs'])
@@ -119,7 +124,7 @@ def readComments(obj, threadId, threadUrl, cur,parentID):
 
         # Or is it the title post?
         elif 'selftext' in i['data']:
-            commentID = commentId
+
             url = i['data']['url']
             content = i['data']['selftext']
             score = i['data']['score']
@@ -133,19 +138,21 @@ def readComments(obj, threadId, threadUrl, cur,parentID):
                     imgName = link.split("/")[-1]
                     newLink = "http://i.imgur.com/" + imgName + ".png"
                     imgLinks.append(newLink)
+            commentId = 'root'
             if len(imgLinks) > 0:
                 print
                 "found links: " + str(imgLinks)
-                commentImages[commentID] = imgLinks
-            commentIDtoParentMap[commentID] = "root"
-            childList = []
-            if "root" in commentIDtoChildMap:
-                childList = commentIDtoChildMap["root"]
-                childList.append(commentID)
-            else:
-                childList = []
-                childList.append(commentID)
-            commentIDtoChildMap[parentID] = childList
+                commentImages[commentId] = imgLinks
+            commentIDtoParentMap[commentId] = None
+
+            # childList = []
+            # if "root" in commentIDtoChildMap:
+            #     childList = commentIDtoChildMap["root"]
+            #     childList.append(commentID)
+            # else:
+            #     childList = []
+            #     childList.append(commentID)
+            # commentIDtoChildMap[parentID] = childList
 
         # Save!
         # try:
@@ -208,7 +215,7 @@ def downloadImage(image_url,out_dir,out_name):
             raise
 
         except:
-            print "Error Fetching URL:",each
+            print "Error Fetching URLm:",each
             traceback.print_exc()
 
 def downloadImages(image_urls,out_dir,k):
@@ -226,32 +233,37 @@ def downloadImages(image_urls,out_dir,k):
     i = 0
     for each in image_urls:
         each0 = each[0].replace(")", "")
-        try:
-            print "Reading URL:",each0
-            f = urllib2.urlopen(each0,timeout=10)
-            data = f.read()
-            f.close()
-            print "   Datasize:",len(data)
-            if len(data) > 600:
-                bn = urlparse.urlsplit(each0).path.split('/')[-1]
-                ftype = bn.split(".")
-                ftype = ftype[len(ftype) - 1]
-                imgName = "g"+"%03d_"%k + each[1] + "."+ftype
-                out_path = os.path.join(out_dir,imgName)
-                imageNameList[each[1]]=(imgName,out_path,each)
-                f = open(out_path,'wb')
-                f.write(data)
+        bn = urlparse.urlsplit(each0).path.split('/')[-1]
+        ftype = bn.split(".")
+        ftype = ftype[len(ftype) - 1]
+        imgName = "g" + "%03d_" % k + each[1] + "." + ftype
+        out_path = os.path.join(out_dir, imgName)
+        shouldAdd = True
+        if not os.path.exists(out_path):
+            try:
+                print "Reading URL:",each0
+                f = urllib2.urlopen(each0,timeout=10)
+                data = f.read()
                 f.close()
-                i+=1
+                print "   Datasize:",len(data)
+                if len(data) > 600:
+                    f = open(out_path,'wb')
+                    f.write(data)
+                    f.close()
+                    i+=1
+                else:
+                    shouldAdd = False
 
+            except KeyboardInterrupt:
+                raise
 
-        except KeyboardInterrupt:
-            raise
+            except:
+                print "Error Fetching URL:",each
+                imageNameList[each[1]] = (None,None,None)
+                traceback.print_exc()
 
-        except:
-            print "Error Fetching URL:",each
-            imageNameList[each[1]] = (None,None,None)
-            traceback.print_exc()
+        if shouldAdd:
+            imageNameList[each[1]] = (imgName, out_path, each)
     return imageNameList
 
 
@@ -330,7 +342,7 @@ outputDirectory = "./default/"
 if len(sys.argv) >= 2:
     if sys.argv[1] == "--get-comments":
         outputDirectory =  sys.argv[2] #"/Users/joel/Downloads/simple-reddit-crawler-master/reader/RedditDataset2"
-singleDir = True
+singleDir = False
 while (not shouldReadThreads and postCount < maxPosts) or shouldReadThreads or not shouldReadComments:
 
     # Log starting time
@@ -351,14 +363,14 @@ while (not shouldReadThreads and postCount < maxPosts) or shouldReadThreads or n
             subredditUrl = baseUrl + subreddit + "/top.json?sort=top&t=all&"
         else:
             getReq = getJsonPageForPostCount(postCount,nextID)
-            subredditUrl = baseUrl + subreddit + "/top" + getReq
+            subredditUrl = baseUrl + subreddit + "/top.json?sort=top&t=all&" + getReq
         postCount += 25
         print "reading url: " + subredditUrl
         jsonObj = requestJson(subredditUrl, delay)
 
         # Save the threads
         nextID = jsonObj['data']['after']
-        print "after = " + nextID
+        # print "after = " + nextID
         readThreads(jsonObj['data']['children'], cur)
         conn.commit()
 
@@ -377,8 +389,17 @@ while (not shouldReadThreads and postCount < maxPosts) or shouldReadThreads or n
             threadTitle = w[0]
             title_nice = threadTitle.replace(" ", "_")
             title_nice = title_nice.replace("/","_")
-            title_nice = title_nice.replace("/n","_")
-
+            title_nice = title_nice.replace("/n","_").replace(".","").split(":")[-1]
+            # if 'Poop' not in title_nice:
+            #     print("skipping...")
+            #     continue
+            if singleDir:
+                outdir = outputDirectory
+            else:
+                outdir = os.path.join(outputDirectory, title_nice)
+            if os.path.exists(outdir):
+                print('skipping...')
+                continue
             rootImageLink = w[2]
             # Prepare the http request
             print
@@ -386,31 +407,28 @@ while (not shouldReadThreads and postCount < maxPosts) or shouldReadThreads or n
             jsonData = requestJson(baseUrl + urllib2.quote(v.encode('utf8')) + ".json", delay)
 
             #Download the root image
-            if singleDir:
-                outdir = outputDirectory
-            else:
-                outdir = os.path.join(outputDirectory, str(k))
+
             if ".jpg" in rootImageLink or ".png" in rootImageLink or ".gif" in rootImageLink or "i.imgur" in rootImageLink:
                 rootImageLink = rootImageLink
             elif "imgur" in rootImageLink:
                 imgName = rootImageLink.split("/")[-1]
                 newLink = "http://i.imgur.com/" + imgName + ".png"
                 rootImageLink = newLink
+
             suffix = rootImageLink.split(".")
             suffix = suffix[len(suffix)-1]
             imname = "g" + "%03d_" % k + "i" + "%03d_" % 0 + "." + suffix
             downloadImage(rootImageLink,outdir,imname)
-            commentImages['0000'] = rootImageLink
-            commentIDtoParentMap['0000'] = 'root'
-            commentIDtoParentMap['root'] = ['0000']
+            commentImages['root'] = rootImageLink
+            commentIDtoParentMap['root'] = None
             # Read the Thread
             # 0 = title
             postData = jsonData[0]['data']['children']
-            readComments(postData, k, v, cur,"")
+            readComments(postData, k, v, cur,'root')
 
             # 1 = comments
             data = jsonData[1]['data']['children']
-            readComments(data, k, v, cur,"")
+            readComments(data, k, v, cur,'root')
 
             # Save!
             # conn.commit()
@@ -422,8 +440,11 @@ while (not shouldReadThreads and postCount < maxPosts) or shouldReadThreads or n
             links = []
             for commentID in commentImages.keys():
                 imageLinks = commentImages[commentID]
-                for l in imageLinks:
-                    allImageLinks.append((l,commentID))
+                if not isinstance(imageLinks,string_types):
+                    for l in imageLinks:
+                        allImageLinks.append((l,commentID))
+                else:
+                    allImageLinks.append((imageLinks,'root'))
             imageNamesList = downloadImages(allImageLinks, outdir,k)
             for commentID in commentImages.keys():
                 imageWebLinks = commentImages[commentID]
@@ -435,12 +456,12 @@ while (not shouldReadThreads and postCount < maxPosts) or shouldReadThreads or n
                     if imageNamesData is not None:
                         node['file']=imageNamesData[1]
                         node['fileid']=imageNamesData[0]
-                        node['URL'] = imageNamesData[1]
+                        node['URL'] = imageNamesData[2]
                         nodes.append(node)
             for commentID in commentImages.keys():
                 currentParent = commentIDtoParentMap[commentID]
                 # Hop up comment tree until we find a comment with an image
-                while (currentParent not in commentImages.keys() or imageNamesList[currentParent] is None) and not currentParent == "root":
+                while (currentParent not in commentImages.keys()) and not currentParent == "root" and currentParent is not None:
                     currentParent = commentIDtoParentMap[currentParent]
                 link = {}
                 link['source'] = currentParent
@@ -455,7 +476,9 @@ while (not shouldReadThreads and postCount < maxPosts) or shouldReadThreads or n
             finalDict['directed'] = True
             if not os.path.exists(outputDirectory):
                 os.makedirs(outputDirectory)
-            with open(os.path.join(outputDirectory,"graph_"+str(k)+".json"),'w') as f:
+            with open(os.path.join(outputDirectory,"graph_"+title_nice+".json"),'w') as f:
+                json.dump(finalDict,f)
+            with open(os.path.join(outdir,"graph_"+title_nice+".json"),'w') as f:
                 json.dump(finalDict,f)
 
             # for commentID in commentIDtoParentMap.keys():

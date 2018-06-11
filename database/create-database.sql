@@ -1,3 +1,4 @@
+DROP SCHEMA reddit;
 CREATE SCHEMA reddit DEFAULT CHARSET 'utf8' COLLATE 'utf8_general_ci';
 
 USE reddit;
@@ -8,6 +9,7 @@ id_thread varchar(16) not null unique key,
 id_sub int not null,
 title text not null,
 url varchar(255) not null,
+link varchar(255) not null,
 score int not null,
 created int
 ) engine=innodb;
